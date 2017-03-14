@@ -18,7 +18,7 @@ const differenceById = differenceWith(eqProps('id'))
 
 const fetchWord= http("get", {type:"json"})("http://localhost:3000/word")
 
-const defualtMapResults = (body) =>{
+const defaultMapResults = (body) =>{
   const {total,page,perPage} =body
   const results = body.results.map( r=>{return { id:r,value:r } })
   return {total,page,perPage,results}
@@ -166,7 +166,7 @@ app.model({
       return mergeAll([state,{ highlighted: -1, selections}, clearSuggestions()])
     },
     setFetched: (state, body) =>{
-      const {total,page, perPage,results} = defualtMapResults(body)
+      const {total,page, perPage,results} = defaultMapResults(body)
       if (page===0) {
         const suggestions = differenceById(results , state.selections)
         return merge(state,{loading:false, page,total,perPage, suggestions})
