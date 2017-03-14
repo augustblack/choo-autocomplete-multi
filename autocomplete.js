@@ -206,7 +206,7 @@ const selection= (sel, send) => html`<li class="selection" >${sel.value} <span c
 const selections = ( sels, send) => html`<ul class="selections">${sels.map( s => selection(s,send)) }</ul>`
 const showMore = (state,send)=> {
   if( ( state.page+1)*state.perPage < state.total )
-    return html`<li class="suggestion" onmousedown=${ e=>{e.preventDefault(); send('fetchMore',{})}}>Show more....</li>`
+    return html`<li class="suggestion" onmousedown=${ e=>{e.preventDefault(); send('fetchMore',{})}}>Show more....${ state.loading ? "loading":"" }</li>`
   return html``
 }
 
@@ -218,7 +218,7 @@ onmouseover=${ e=>{send('setHighlight', idx) }}
 >${sug.value}</li>`
 
 const suggestions = (state, send) =>{
-  if (state.loading) {
+  if (state.loading && state.suggestions.length===0) {
    return html`<div class="container" id="suggestions_container"><ul class="suggestions" id="suggestions"><li>loading... </li></ul></div>`
   }
   return html`<div class="container" id="suggestions_container">
