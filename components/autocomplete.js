@@ -10,14 +10,11 @@ const {
   compose,
   map,
   tap,
-  bind,
-  mergeAll,
   merge
 } = require('ramda')
 
 const http = require('../utils/http')
 const { nsify, debounce } = require('../utils')
-const log = bind(console.log, console);
 
 const uniqById = uniqWith(eqProps('id'))
 const differenceById = differenceWith(eqProps('id'))
@@ -28,7 +25,7 @@ const fetchGithub= compose(
 )
 const fetchWord= compose(
   http("get", {type:"json"})("http://localhost:3000/word"),
-  ({term,page})  => {console.log("term",term);return {term,page} }
+  ({term,page})  => {return {term,page} }
 )
 
 const UP_KEYCODE = 38
