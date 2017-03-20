@@ -1,32 +1,34 @@
 const request = require('superagent')
 const Task = require('ramda-fantasy').Future
+const forEachObjIndexed  = require('ramda').forEachObjIndexed
 
+const setOpts = xhr => forEachObjIndexed((value,key )=>{
+  if (xhr && xhr[key])
+    xhr[key](value)
+})
 // httpGet :: String -> Task Error ResponseJSON
 module.exports = ( method, options ) => {
   const _method = method ? method.toLowerCase() : "get";
   const _opts = options || {}
-  let xhr=null; //hold on to last one
+  let _xhr=null; //hold on to last one
 
   return (url) => {
     return ( data) => {
       return new Task((reject, resolve) => {
-        if ( xhr && xhr.abort){
-          xhr.abort()
+        if ( _xhr && _xhr.abort){
+          _xhr.abort()
         }
-        xhr=  request[_method](url)
-        Object.entries(_opts).forEach( ([key, value]) =>{
-          if (xhr && xhr[key])
-            xhr[key](value)
-        })
+        _xhr=  request[_method](url)
+        setOpts(_xhr)(_opts)
         if (data) {
           if (_method==="get") {
-            xhr.query(data)
+            _xhr.query(data)
           }
           else if (_method==="post" || _method==="put"){
-            xhr.send(data)
+            _xhr.send(data)
           }
         }
-        xhr.end( (err,res)=>{
+        _xhr.end( (err,res)=>{
           if (err || !res.ok) {
             return reject( (res && res.body && res.body.error ) ? res.body.error : err)
           }
