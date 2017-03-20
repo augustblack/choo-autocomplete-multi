@@ -1,54 +1,52 @@
-var html = require('choo/html')
+const html = require('bel')
+const {
+  identity,
+  match,
+  where
+} = require('ramda')
+const Task = require('ramda-fantasy').Future
+const ac= require('../components/autocomplete')
+const {nsify} = require('../utils')
 
-const model = {
-	namespace: "logs",
-  state: {
-    items: []
-  },
-  reducers: {
-    receiveTodos: (state, data) => {
-      return { tasks: data }
-    },
-    receiveNewTodo: (state, data) => {
-      return { tasks: state.tasks.slice().concat(data)}
-    },
-    replaceTodo: (state, data) => {
-      const newTodos = state.tasks.slice()
-      newTodos[data.index] = data.todo
-      return { tasks: newTodos }
-    }
-  },
-  effects: {
-    getTodos: (state, data, send, done) => {
-      store.getAll('tasks', (tasks) => {
-        send('todos:receiveTodos', tasks, done)
-      })
-    },
-		addTodo: (state, data, send, done) => {
-			console.log("addTodo", state)
-      const todo = extend(data, {
-        completed: false
-      })
+const staticSugs = [
+  {id:1, value:"hello"},
+  {id:2, value:"blah"},
+  {id:3, value:"blahblo"}
+]
 
-      store.add('tasks', todo, () => {
-        send('todos:receiveNewTodo', todo, done)
-      })
-    },
-    updateTodo: (state, data, send, done) => {
-      const oldTodo = state.tasks[data.index]
-      const newTodo = extend(oldTodo, data.updates)
+const fetchTask = (x) => new Task( (reject, resolve) =>{
+  const reg =new RegExp("^"+x.term, "i")
+  const results = staticSugs.filter( s=> s.value.match(reg)!==null)
+  resolve({
+    body: {
+    page:0,
+    total: results.length,
+    perPage: results.length,
+    results,
+  } })
+})
 
-      store.replace('tasks', data.index, newTodo, () => {
-        send('todos:replaceTodo', { index: data.index, todo: newTodo }, done)
-      })
-    }
+module.exports = (app,{
+  namespace=new Date().getTime(),
+    defaultState={},
+})=>{
+
+  const components= [
+    ac(app,{namespace: nsify( namespace, "ac1" )}),
+    ac(app,{
+      namespace: nsify( namespace, "ac2" ),
+      fetchTask,
+      mapResults:identity
+    })
+  ]
+  return (state, emit) => {
+    //console.log("state", state)
+    return html`<div>
+    ${ components[0](state,emit) }
+    ${ components[1](state,emit) }
+    <div>pagination</div>
+    <div>results</div>
+    </div>
+    `
   }
-}
-
-
-module.exports = function (page) {
-  return html`
-    <div>
-    logs
-    </div>`
 }
