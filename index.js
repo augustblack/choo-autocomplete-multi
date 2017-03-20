@@ -9,7 +9,7 @@ const logs = require('./pages/logs')
 const app = choo()
 
 const usersC  = users( app, {namespace:"users"} )
-const logsC = users( app, {namespace:"logs"} )
+const logsC = logs( app, {namespace:"logs"} )
 
 const usersPage = layout( usersC )
 const logsPage = layout( logsC )
