@@ -5,6 +5,7 @@ const {
   match,
   where
 } = require('ramda')
+
 const Task = require('ramda-fantasy').Future
 const ac= require('../components/autocomplete')
 const {nsify} = require('../utils')
@@ -16,11 +17,16 @@ const staticSugs = [
   {id:3, value:"blahblo"}
 ]
 
-const gitMap = (body) => {
-  const {total_count, items, incomplete_results} = body
+const gitMap = (res) => {
+  if (!(res && res.body) ) {
+    return {total:0,page:0, perPage:10,results:[]}
+  }
+  const pageReg = /.*=(\d*)$/
+  const {total_count, items, incomplete_results} = res.body
   const results = items.map(r => { return { id: r.id, value: r.full_name } })
-  const ret = {total:total_count, page:0, perPage:items.length, results}
-  console.log("ret", ret)
+  // need to parse out the page from the initial request, lame :(
+  const page = parseInt(pageReg.exec(( res.req && res.req.url ) ? res.req.url : "=0")[1])
+  const ret = {total:total_count, page, perPage:items.length, results}
   return ret
 }
 
@@ -30,16 +36,21 @@ const fetchGithub = compose(
   ({term, page}) => { return {q: encodeURI(term), page} }
 )
 
-const fetchTask = (x) => new Task( (reject, resolve) =>{
+const fetchWord = compose(
+  http('get', {type: 'json'})('http://localhost:3000/word'),
+  ({term, page}) => { return {term, page} }
+)
+
+
+const fetchStatic = (x) => new Task( (reject, resolve) =>{
   const reg =new RegExp("^"+x.term, "i")
   const results = staticSugs.filter( s=> s.value.match(reg)!==null)
   resolve({
-    body: {
     page:0,
     total: results.length,
     perPage: results.length,
     results,
-  } })
+  } )
 })
 
 module.exports = (app,{
@@ -48,10 +59,13 @@ module.exports = (app,{
 })=>{
 
   const components= [
-    ac(app,{namespace: nsify( namespace, "ac1" )}),
+    ac(app,{
+      namespace: nsify( namespace, "ac1" ),
+      fetchTask: fetchWord
+    }),
     ac(app,{
       namespace: nsify( namespace, "ac2" ),
-      fetchTask,
+      fetchTask: fetchStatic,
       mapResults:identity
     }),
     ac(app,{

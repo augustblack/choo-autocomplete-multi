@@ -1,8 +1,10 @@
 const html = require('bel')
 const request = require('superagent')
 const css = require('sheetify')
+const Task = require('ramda-fantasy').Future
 
 const {
+  curry,
   eqProps,
   uniqWith,
   differenceWith,
@@ -19,10 +21,9 @@ const { nsify, debounce } = require('../utils')
 const uniqById = uniqWith(eqProps('id'))
 const differenceById = differenceWith(eqProps('id'))
 
-const fetchWord = compose(
-  http('get', {type: 'json'})('http://localhost:3000/word'),
-  ({term, page}) => { return {term, page} }
-)
+const fetchDefault = new Task( (reject, resolve) =>{
+  reject(new Error("No autocomplete task set"))
+})
 
 const UP_KEYCODE = 38
 const DOWN_KEYCODE = 40
@@ -30,10 +31,14 @@ const ENTER_KEYCODE = 13
 const TAB_KEYCODE = 9
 const DELETE_KEYCODE = 46
 
-const defaultMapResults = (body) => {
-  const {total, page, perPage} = body
-  const results = body.results.map(r => { return { id: r, value: r } })
-  return {total, page, perPage, results}
+const defaultMapResults = (res) => {
+  if (!(res && res.body) ) {
+    return {total:0,page:0, perPage:10,results:[]}
+  }
+  const {total, page, perPage} = res.body
+  const results = res.body.results.map(r => { return { id: r, value: r } })
+  const ret ={total, page, perPage, results}
+  return ret
 }
 
 const removeSelReducer = (data) => (acc, i) => {
@@ -42,15 +47,6 @@ const removeSelReducer = (data) => (acc, i) => {
 }
 const debounce300 = debounce(300)
 
-const testdata = [
-  {id: 'w', value: 'w'},
-  {id: 'wa', value: 'wa'},
-  {id: 'wah', value: 'wah'},
-  {id: 'waht', value: 'waht'},
-  {id: 'wahtt', value: 'wahtt'},
-  {id: 'wahtth', value: 'wahtth'},
-  {id: 'wahtthefuck', value: 'wahtthefuck'}
-]
 const defaultState = {
   term: '',
   page: 0,
@@ -58,14 +54,15 @@ const defaultState = {
   total: 0,
   highlighted: -1,
   loading: false,
+  error: null,
   suggestions: [],
   selections: []
 }
 
 module.exports = (app, {
   namespace = new Date().getTime(),
-  initialState = defaultState,
-  fetchTask = fetchWord,
+  initialState =  {},
+  fetchTask = fetchDefault,
   mapResults = defaultMapResults,
   suggestionView = (sug) => sug.value,
   selectionView = (sel) => sel.value
@@ -95,6 +92,10 @@ module.exports = (app, {
       margin: 0.5rem;
       position: relative;
       cursor: text;
+      background: white;
+    }
+    :host.error {
+      background:#ff0000;
     }
     :host .suggestion, .selection{
       list-style-type: none;
@@ -162,16 +163,17 @@ module.exports = (app, {
   }
 
   app.use((state, bus) => {
-    state[namespace] = merge(state[namespace], initialState)
+    state[namespace] = merge(state[namespace], merge(defaultState,initialState))
     bus.on('DOMContentLoaded', function () {
-      bus.on(sym.setState, setState),
-        bus.on(sym.clearSuggestions, () => setState(emptySuggestions)),
-          bus.on(sym.addToSelections, addToSelections)
+      bus.on(sym.setState, setState)
+      bus.on(sym.clearSuggestions, () => setState(emptySuggestions))
+      bus.on(sym.addToSelections, addToSelections)
       bus.on(sym.removeFromSelections, removeFromSelections)
       bus.on(sym.moveHighlight, moveHighlight)
       bus.on(sym.setHighlight, setHighlight)
       bus.on(sym.takeHighlighted, takeHighlighted)
       bus.on(sym.setFetched, setFetched)
+      bus.on(sym.errorOnFetch, (error)=> setState({error}))
       bus.on(sym.fetchSugggestions, fetchSugggestions)
       bus.on(sym.fetchMore, fetchMore)
     })
@@ -182,11 +184,17 @@ module.exports = (app, {
 
     const addToSelections = (sel) => {
       const selections = uniqById(concat(state[namespace].selections, [sel]))
-      return setState(merge({term: '', selections, highlighted: -1}, emptySuggestions))
+      return setState(
+        merge( {
+          term: '',
+          selections,
+          highlighted: -1
+        }, emptySuggestions)
+      )
     }
     const removeFromSelections = (data) => {
       const selections = state[namespace].selections
-        .reduce(removeSelReducer(data), [])
+      .reduce(removeSelReducer(data), [])
       return setState({selections})
     }
     const moveHighlight = (val) => {
@@ -205,9 +213,9 @@ module.exports = (app, {
       const selections = uniqById(concat(s.selections, [word]))
       return setState(merge({ term: '', highlighted: -1, selections}, emptySuggestions))
     }
-    const setFetched = (body) => {
+    const setFetched = (res) => {
       const s = state[namespace]
-      const {total, page, perPage, results} = mapResults(body)
+      const {total, page, perPage, results} = mapResults(res)
       if (page === 0) {
         const suggestions = differenceById(results, s.selections)
         return setState({loading: false, page, total, perPage, suggestions})
@@ -216,22 +224,27 @@ module.exports = (app, {
         return setState({loading: false, page, total, perPage, suggestions})
       }
     }
+    const fetchErr = curry( (bus,sym,err)=>{
+      bus.emit(sym.errorOnFetch, err)
+    })
     const fetchSugggestions = (term) => {
+      const s = state[namespace]
       if (!term || term.length < 1) {
         return setState(merge({term: ''}, emptySuggestions))
       }
-      setState({term, loading: true, page: 0, total: 0, suggestions: []})
-      fetchTask({term, page: 1})
-        .fork(err => bus.emit(sym.errorOnFetch, err), res => setFetched(res.body || {}))
+      setState({term, loading: true, error:null, page: 0, total: 0, suggestions: []})
+      fetchTask({term, page: s.page})
+      .fork( fetchErr(bus,sym), setFetched)
     }
     const fetchMore = () => {
       const s = state[namespace]
       if (!s.term || s.term.length < 1) {
         return setState(emptySuggestions)
       }
-      setState({loading: true})
-      fetchTask({term: s.term, page: s.page + 1})
-        .fork(err => bus.emit(sym.errorOnFetch, err), res => setFetched(res.body || {}))
+      setState({loading: true, error:null})
+      const nextPage = s.page +1
+      fetchTask({term: s.term, page: nextPage})
+      .fork( fetchErr(bus,sym), setFetched)
     }
   })
 
@@ -290,7 +303,7 @@ module.exports = (app, {
 
     return html`
       <div
-        class="${acstyle}"
+        class="autocomplete ${acstyle} ${state[namespace].error ? 'error': '' }"
         style="${state[namespace].suggestions.length ? 'z-index:99;' : 'z-index:1;'}"
         id="${nsify(namespace, 'main')}"
         onmouseup=${e => document.querySelector('#' + sym.acinput).focus()}>
