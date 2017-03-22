@@ -10,7 +10,7 @@
     "start": "budo index.js:static/bundle.js --pushstate --live --open -- -t sheetify/transform -t envify -t babelify",
     "startbankai": "bankai start index --open -t sheetify/transform -t envify -t babelify -t yo-yoify",
     "build": "rm -rf dist && mkdir -p dist && NODE_ENV=production browserify -e index.js -t sheetify/transform  -t babelify -g unassertify > dist/bundle.js",
-    "buildit": "rm -rf dist && mkdir -p dist && NODE_ENV=production browserify -e index.js -t envify -t yo-yoify -t babelify  -g unassertify -g sheetify -g uglifyify  | uglifyjs > dist/bundle.js"
+    "buildit": "rm -rf dist && mkdir -p dist && NODE_ENV=production browserify index.js -o bundle.js -t [sheetify/transform -u sheetify-nested] -t [babelify --presets [es2020]] -g yo-yoify -g uglifyify  | uglifyjs > dist/bundle.js"
   },
   "author": "",
   "license": "ISC",
@@ -30,7 +30,7 @@
     "bankai": "^5.4.0",
     "browserify": "^14.1.0",
     "budo": "^9.4.7",
-    "choo": "^5.0.0-5",
+    "choo": "^5.0.0",
     "envify": "^4.0.0",
     "ramda": "^0.23.0",
     "ramda-fantasy": "^0.7.0",

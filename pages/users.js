@@ -1,5 +1,6 @@
 const html = require('bel')
 const {
+  compose,
   identity,
   match,
   where
@@ -7,12 +8,27 @@ const {
 const Task = require('ramda-fantasy').Future
 const ac= require('../components/autocomplete')
 const {nsify} = require('../utils')
+const http = require('../utils/http')
 
 const staticSugs = [
   {id:1, value:"hello"},
   {id:2, value:"blah"},
   {id:3, value:"blahblo"}
 ]
+
+const gitMap = (body) => {
+  const {total_count, items, incomplete_results} = body
+  const results = items.map(r => { return { id: r.id, value: r.full_name } })
+  const ret = {total:total_count, page:0, perPage:items.length, results}
+  console.log("ret", ret)
+  return ret
+}
+
+
+const fetchGithub = compose(
+  http('get', {type: 'json'})('https://api.github.com/search/repositories'),
+  ({term, page}) => { return {q: encodeURI(term), page} }
+)
 
 const fetchTask = (x) => new Task( (reject, resolve) =>{
   const reg =new RegExp("^"+x.term, "i")
@@ -37,13 +53,18 @@ module.exports = (app,{
       namespace: nsify( namespace, "ac2" ),
       fetchTask,
       mapResults:identity
+    }),
+    ac(app,{
+      namespace: nsify( namespace, "acgithub" ),
+      fetchTask:fetchGithub,
+      mapResults: gitMap
     })
+
   ]
   return (state, emit) => {
     //console.log("state", state)
     return html`<div>
-    ${ components[0](state,emit) }
-    ${ components[1](state,emit) }
+    ${ components.map( c => c(state,emit) )}
     <div>pagination</div>
     <div>results</div>
     </div>

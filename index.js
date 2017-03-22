@@ -8,24 +8,12 @@ const logs = require('./pages/logs')
 
 const app = choo()
 
-const usersC  = users( app, {namespace:"users"} )
-const logsC = logs( app, {namespace:"logs"} )
-
-const usersPage = layout( usersC )
-const logsPage = layout( logsC )
+const usersPage = layout(users( app, {namespace:"users"} ))
+const logsPage = layout(logs( app, {namespace:"logs"} ))
 
 app.route("/", usersPage )
 app.route("/users", usersPage )
 app.route("/logs", logsPage)
-
-/*
-//['/', redirect( '/users') ],
-([
-  ['/', layout(users.getView("users"))],
-]).forEach( (r)=>{
-  app.route(r[0], r[1])
-})
-*/
 
 const tree = app.start()
 document.body.appendChild(tree)
