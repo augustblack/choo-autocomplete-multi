@@ -55,26 +55,26 @@ const fetchStatic = (x) => new Task( (reject, resolve) =>{
 
 module.exports = (app,{
   namespace=new Date().getTime(),
-    defaultState={},
+  initialState={},
 })=>{
 
   const components= [
-    ac(app,{
-      namespace: nsify( namespace, "ac1" ),
+    {
+      namespace: nsify( namespace, "ac_words" ),
       fetchTask: fetchWord
-    }),
-    ac(app,{
-      namespace: nsify( namespace, "ac2" ),
+    },
+    {
+      namespace: nsify( namespace, "ac_static" ),
       fetchTask: fetchStatic,
       mapResults:identity
-    }),
-    ac(app,{
-      namespace: nsify( namespace, "acgithub" ),
+    },
+    {
+      namespace: nsify( namespace, "ac_github" ),
       fetchTask:fetchGithub,
       mapResults: gitMap
-    })
+    }
+  ].map( c=> ac(app, c))
 
-  ]
   return (state, emit) => {
     //console.log("state", state)
     return html`<div>
